@@ -1,0 +1,94 @@
+
+@page "/"
+@inject HttpClient Http
+
+<h3>Buscar Agente VALORANT</h3>
+
+<label>UUID do Agente:</label>
+
+<input class="form-control" @bind="uuid" />
+
+<br />
+
+<button class="btn btn-primary" @onclick="BuscarAgente">
+    Buscar Agente
+</button>
+
+<hr />
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <p>@erro</p>
+}
+
+@if (agente != null)
+{
+    <h3>@agente.DisplayName</h3>
+
+    <img src="@agente.FullPortrait"
+         alt="@agente.DisplayName"
+         style="height: 300px;" />
+
+    <p>@agente.Description</p>
+}
+
+
+@code {
+    private const string GekkoUuid = "e370fa57-4757-3604-3648-499e1f642d3f";
+    private const string ReynaUuid = "a3bfb853-43b2-7238-a4f1-ad90e9e46bcc";
+
+    private string uuid = "";
+    private bool carregando;
+    private string? erro;
+    private ValorantAgent? agente;
+
+    private void SelecionarUuid(string valor) => uuid = valor;
+
+    private async Task BuscarAgente()
+    {
+        erro = null;
+        agente = null;
+
+        if (!Guid.TryParse(uuid.Trim(), out var id))
+        {
+            erro = "Informe um UUID válido (36 caracteres com hífens).";
+            return;
+        }
+
+        carregando = true;
+        try
+        {
+            var endereco = $"https://valorant-api.com/v1/agents/{id:D}";
+            using var resposta = await Http.GetAsync(endereco);
+
+            if (resposta.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                erro = "Agente não encontrado. Confira o UUID informado.";
+                return;
+            }
+
+            resposta.EnsureSuccessStatusCode();
+            var resultado = await resposta.Content.ReadFromJsonAsync<ValorantApiResponse>();
+
+            if (resultado?.Data is null)
+            {
+                erro = "A API não retornou os dados do agente.";
+                return;
+            }
+
+            agente = resultado.Data;
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível acessar a API. Verifique sua conexão e tente novamente.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            erro = "A API retornou dados em formato inesperado.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
